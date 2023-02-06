@@ -4,126 +4,19 @@
   
     
     <entry>
-      <title>test</title>
-      <link href="/2023/02/05/test/"/>
-      <url>/2023/02/05/test/</url>
+      <title>条件构造器</title>
+      <link href="/2023/02/06/MybatisPlus%E7%B3%BB%E5%88%97(%E4%B8%80):%E6%9D%A1%E4%BB%B6%E6%9E%84%E9%80%A0%E5%99%A8/"/>
+      <url>/2023/02/06/MybatisPlus%E7%B3%BB%E5%88%97(%E4%B8%80):%E6%9D%A1%E4%BB%B6%E6%9E%84%E9%80%A0%E5%99%A8/</url>
       
-        <content type="html"><![CDATA[]]></content>
+        <content type="html"><![CDATA[<h2 id="一、引言"><a href="#一、引言" class="headerlink" title="一、引言"></a>一、引言</h2><blockquote><p>说明：</p><p>条件构造器构造条件时，一般支持两到三个入参，使用以下两个入参情况较多（R column, Object val）；第一个参数是一个boolean类型，默认为true，表示加入到最后构造的sql当中；因此在构造条件时，可以将判断加在外面，也可以写在第一个参数处</p></blockquote><h2 id="二、Wrapper"><a href="#二、Wrapper" class="headerlink" title="二、Wrapper"></a>二、Wrapper</h2><h3 id="AbstractWrapper"><a href="#AbstractWrapper" class="headerlink" title="AbstractWrapper"></a>AbstractWrapper</h3><blockquote><p>说明:</p><p>QueryWrapper(LambdaQueryWrapper) 和UpdateWrapper(LambdaUpdateWrapper) 的父类用于生成 sql 的 where 条件, entity 属性也用于生成 sql 的 where 条件<br>注意: entity 生成的 where 条件与 使用各个 api 生成的 where 条件<strong>没有任何关联行为</strong></p></blockquote><p>作为父类，AbstractWrapper包含了大量构造条件所用方法</p><p>常用方法不再赘述，具体参考MyBatis-Plus官网：<a href="https://baomidou.com/pages/10c804/#alleq:~:text=%23-,AbstractWrapper,-%E8%AF%B4%E6%98%8E%3A">条件构造器-AbstractWrapper</a></p><p>需要稍微注意的是以下几个方法</p><h4 id="inSql"><a href="#inSql" class="headerlink" title="inSql"></a>inSql</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">inSql(R column, String inValue)</span><br></pre></td></tr></table></figure><p>其中，inValue代表sql语句，即开发者可以直接将sql语句作为参数传递进来，作为查询条件构造</p><ul><li>字段 IN ( sql语句 )</li><li>例: <code>inSql(&quot;age&quot;, &quot;1,2,3,4,5,6&quot;)</code>—&gt;<code>age in (1,2,3,4,5,6)</code></li><li>例: <code>inSql(&quot;id&quot;, &quot;select id from table where id &lt; 3&quot;)</code>—&gt;<code>id in (select id from table where id &lt; 3)</code></li></ul><h4 id="having"><a href="#having" class="headerlink" title="having"></a>having</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">having(String sqlHaving, Object... params)</span><br><span class="line">having(<span class="type">boolean</span> condition, String sqlHaving, Object... params)</span><br></pre></td></tr></table></figure><ul><li>HAVING ( sql语句 )</li><li>例: <code>having(&quot;sum(age) &gt; 10&quot;)</code>—&gt;<code>having sum(age) &gt; 10</code></li><li>例: <code>having(&quot;sum(age) &gt; &#123;0&#125;&quot;, 11)</code>—&gt;<code>having sum(age) &gt; 11</code></li></ul><h4 id="func"><a href="#func" class="headerlink" title="func"></a>func</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">func(Consumer&lt;Children&gt; consumer)</span><br><span class="line">func(<span class="type">boolean</span> condition, Consumer&lt;Children&gt; consumer)</span><br></pre></td></tr></table></figure><ul><li>func 方法(主要方便在出现if…else下调用不同方法能不断链)</li><li>例: <code>func(i -&gt; if(true) &#123;i.eq(&quot;id&quot;, 1)&#125; else &#123;i.ne(&quot;id&quot;, 1)&#125;)</code></li></ul><h4 id="or"><a href="#or" class="headerlink" title="or"></a>or</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">or()</span><br><span class="line">or(<span class="type">boolean</span> condition)</span><br></pre></td></tr></table></figure><ul><li><p>拼接 OR</p><p>注意事项:</p><p>主动调用<code>or</code>表示紧接着下一个<strong>方法</strong>不是用<code>and</code>连接!(不调用<code>or</code>则默认为使用<code>and</code>连接)</p></li><li><p>例: <code>eq(&quot;id&quot;,1).or().eq(&quot;name&quot;,&quot;老王&quot;)</code>—&gt;<code>id = 1 or name = &#39;老王&#39;</code></p></li></ul><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">or(Consumer&lt;Param&gt; consumer)</span><br><span class="line">or(<span class="type">boolean</span> condition, Consumer&lt;Param&gt; consumer)</span><br></pre></td></tr></table></figure><ul><li>OR 嵌套</li><li>例: <code>or(i -&gt; i.eq(&quot;name&quot;, &quot;李白&quot;).ne(&quot;status&quot;, &quot;活着&quot;))</code>—&gt;<code>or (name = &#39;李白&#39; and status &lt;&gt; &#39;活着&#39;)</code></li></ul><h4 id="and"><a href="#and" class="headerlink" title="and"></a>and</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">and(Consumer&lt;Param&gt; consumer)</span><br><span class="line">and(<span class="type">boolean</span> condition, Consumer&lt;Param&gt; consumer)</span><br></pre></td></tr></table></figure><ul><li>AND 嵌套</li><li>例: <code>and(i -&gt; i.eq(&quot;name&quot;, &quot;李白&quot;).ne(&quot;status&quot;, &quot;活着&quot;))</code>—&gt;<code>and (name = &#39;李白&#39; and status &lt;&gt; &#39;活着&#39;)</code></li></ul><h3 id="QueryWrapper"><a href="#QueryWrapper" class="headerlink" title="QueryWrapper"></a>QueryWrapper</h3><blockquote><p>说明:</p><p>继承自 AbstractWrapper ,自身的内部属性 entity 也用于生成 where 条件<br>及 LambdaQueryWrapper, 可以通过 new QueryWrapper().lambda() 方法获取</p></blockquote><h4 id="select"><a href="#select" class="headerlink" title="select"></a>select</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">select(String... sqlSelect)</span><br><span class="line">select(Predicate&lt;TableFieldInfo&gt; predicate)</span><br><span class="line">select(Class&lt;T&gt; entityClass, Predicate&lt;TableFieldInfo&gt; predicate)</span><br></pre></td></tr></table></figure><ul><li><p>设置查询字段</p><blockquote><p>说明:</p><p>以上方法分为两类.<br>第二类方法为:过滤查询字段(主键除外),入参不包含 class 的调用前需要<code>wrapper</code>内的<code>entity</code>属性有值! 这两类方法重复调用以最后一次为准</p></blockquote></li><li><p>例: <code>select(&quot;id&quot;, &quot;name&quot;, &quot;age&quot;)</code></p></li><li><p>例: <code>select(i -&gt; i.getProperty().startsWith(&quot;test&quot;))</code></p></li></ul><p>在构造Wrapper时，使用select可以减少无用字段的查询</p><h3 id="UpdateWrapper"><a href="#UpdateWrapper" class="headerlink" title="UpdateWrapper"></a>UpdateWrapper</h3><blockquote><p>说明:</p><p>继承自 <code>AbstractWrapper</code> ,自身的内部属性 <code>entity</code> 也用于生成 where 条件<br>及 <code>LambdaUpdateWrapper</code>, 可以通过 <code>new UpdateWrapper().lambda()</code> 方法获取!</p></blockquote><h4 id="set"><a href="#set" class="headerlink" title="set"></a>set</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">set(String column, Object val)</span><br><span class="line">set(<span class="type">boolean</span> condition, String column, Object val)</span><br></pre></td></tr></table></figure><ul><li>SQL SET 字段</li><li>例: <code>set(&quot;name&quot;, &quot;老李头&quot;)</code></li><li>例: <code>set(&quot;name&quot;, &quot;&quot;)</code>—&gt;数据库字段值变为<strong>空字符串</strong></li><li>例: <code>set(&quot;name&quot;, null)</code>—&gt;数据库字段值变为<code>null</code></li></ul><h4 id="setSql"><a href="#setSql" class="headerlink" title="setSql"></a>setSql</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">setSql(String sql)</span><br></pre></td></tr></table></figure><ul><li>设置 SET 部分 SQL</li><li>例: <code>setSql(&quot;name = &#39;老李头&#39;&quot;)</code></li></ul><h4 id="lambda"><a href="#lambda" class="headerlink" title="lambda"></a>lambda</h4><ul><li>获取 <code>LambdaWrapper</code><br>在<code>QueryWrapper</code>中是获取<code>LambdaQueryWrapper</code><br>在<code>UpdateWrapper</code>中是获取<code>LambdaUpdateWrapper</code></li></ul><h4 id="进阶"><a href="#进阶" class="headerlink" title="进阶"></a>进阶</h4><p>上面介绍的都是常规用法，MyBatis-Plus还支持一些更为简洁的书写方式</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">new</span> <span class="title class_">LambdaUpdateChainWrapper</span>&lt;&gt;(testMapper)</span><br><span class="line">        .eq(TestEntity::getIsDelete,<span class="number">0</span>)</span><br><span class="line">        .eq(TestEntity::getName,<span class="string">&quot;张三&quot;</span>)</span><br><span class="line">        .eq(TestEntity::getAge,<span class="number">18</span>)</span><br><span class="line">        .set(TestEntity::getAge,<span class="number">20</span>)</span><br><span class="line">        .set(TestEntity::getUpdateTime,<span class="keyword">new</span> <span class="title class_">Date</span>())</span><br><span class="line">        .update();</span><br></pre></td></tr></table></figure><p>这种方法能够直接按照条件查询并更新数据库</p><blockquote><p>此外，需要注意@TableField(exist &#x3D; false)注解，加了这个注解的参数不会再往数据库写入，同样无法作为条件参数进行查询</p></blockquote><h3 id="使用-Wrapper-自定义SQL"><a href="#使用-Wrapper-自定义SQL" class="headerlink" title="使用 Wrapper 自定义SQL"></a>使用 Wrapper 自定义SQL</h3><blockquote><p>注意事项:</p><p>需要<code>mybatis-plus</code>版本 &gt;&#x3D; <code>3.0.7</code> param 参数名要么叫<code>ew</code>,要么加上注解<code>@Param(Constants.WRAPPER)</code> 使用<code>$&#123;ew.customSqlSegment&#125;</code> 不支持 <code>Wrapper</code> 内的entity生成where语句</p></blockquote><h4 id="用注解"><a href="#用注解" class="headerlink" title="用注解"></a>用注解</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Select(&quot;select * from mysql_data $&#123;ew.customSqlSegment&#125;&quot;)</span></span><br><span class="line">List&lt;MysqlData&gt; <span class="title function_">getAll</span><span class="params">(<span class="meta">@Param(Constants.WRAPPER)</span> Wrapper wrapper)</span>;</span><br></pre></td></tr></table></figure><h4 id="用XML"><a href="#用XML" class="headerlink" title="用XML"></a>用XML</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">List&lt;MysqlData&gt; <span class="title function_">getAll</span><span class="params">(Wrapper ew)</span>;</span><br></pre></td></tr></table></figure><figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">select</span> <span class="attr">id</span>=<span class="string">&quot;getAll&quot;</span> <span class="attr">resultType</span>=<span class="string">&quot;MysqlData&quot;</span>&gt;</span></span><br><span class="line">SELECT * FROM mysql_data $&#123;ew.customSqlSegment&#125;</span><br><span class="line"><span class="tag">&lt;/<span class="name">select</span>&gt;</span></span><br></pre></td></tr></table></figure><p>该方法可以将sql与使用Wrapper构造的查询条件进行拼接，在业务比较复杂，使用wrapper又无法满足需求的时候，拼接可以减少不必要的重写sql工作</p>]]></content>
       
-      
-      <categories>
-          
-          <category> 工具 </category>
-          
-      </categories>
       
       
         <tags>
             
-            <tag> blog </tag>
+            <tag> MybatisPlus </tag>
             
         </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
-      <title>第四篇文章</title>
-      <link href="/2023/02/03/%E7%AC%AC%E5%9B%9B%E7%AF%87%E6%96%87%E7%AB%A0/"/>
-      <url>/2023/02/03/%E7%AC%AC%E5%9B%9B%E7%AF%87%E6%96%87%E7%AB%A0/</url>
-      
-        <content type="html"><![CDATA[]]></content>
-      
-      
-      <categories>
-          
-          <category> 工具 </category>
-          
-      </categories>
-      
-      
-        <tags>
-            
-            <tag> blog </tag>
-            
-        </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
-      <title>第三篇文章</title>
-      <link href="/2023/02/03/%E7%AC%AC%E4%B8%89%E7%AF%87%E6%96%87%E7%AB%A0/"/>
-      <url>/2023/02/03/%E7%AC%AC%E4%B8%89%E7%AF%87%E6%96%87%E7%AB%A0/</url>
-      
-        <content type="html"><![CDATA[]]></content>
-      
-      
-      <categories>
-          
-          <category> 工具 </category>
-          
-      </categories>
-      
-      
-        <tags>
-            
-            <tag> blog </tag>
-            
-        </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
-      <title>第二篇文章</title>
-      <link href="/2023/02/03/%E7%AC%AC%E4%BA%8C%E7%AF%87%E6%96%87%E7%AB%A0/"/>
-      <url>/2023/02/03/%E7%AC%AC%E4%BA%8C%E7%AF%87%E6%96%87%E7%AB%A0/</url>
-      
-        <content type="html"><![CDATA[]]></content>
-      
-      
-      <categories>
-          
-          <category> 工具 </category>
-          
-      </categories>
-      
-      
-        <tags>
-            
-            <tag> blog </tag>
-            
-        </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
-      <title></title>
-      <link href="/2023/02/03/2023-02-03-%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/"/>
-      <url>/2023/02/03/2023-02-03-%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/</url>
-      
-        <content type="html"><![CDATA[]]></content>
-      
-      
-      
-    </entry>
-    
-    
-    
-    <entry>
-      <title>Hello World</title>
-      <link href="/2023/01/30/hello-world/"/>
-      <url>/2023/01/30/hello-world/</url>
-      
-        <content type="html"><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p><h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure><p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p><h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure><p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p><h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure><p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p><h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure><p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>]]></content>
-      
-      
       
     </entry>
     
