@@ -4,11 +4,36 @@
   
     
     <entry>
-      <title>redis详解（二）redis进阶</title>
+      <title>redis详解（三）redis场景与实战</title>
+      <link href="/2023/04/06/redis%E8%AF%A6%E8%A7%A3%EF%BC%88%E4%B8%89%EF%BC%89/"/>
+      <url>/2023/04/06/redis%E8%AF%A6%E8%A7%A3%EF%BC%88%E4%B8%89%EF%BC%89/</url>
+      
+        <content type="html"><![CDATA[]]></content>
+      
+      
+      <categories>
+          
+          <category> Java进阶 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> Redis </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>redis详解（二）redis高可用方案</title>
       <link href="/2023/04/06/redis%E8%AF%A6%E8%A7%A3%EF%BC%88%E4%BA%8C%EF%BC%89/"/>
       <url>/2023/04/06/redis%E8%AF%A6%E8%A7%A3%EF%BC%88%E4%BA%8C%EF%BC%89/</url>
       
-        <content type="html"><![CDATA[<h3 id="一、高可用方案"><a href="#一、高可用方案" class="headerlink" title="一、高可用方案"></a>一、高可用方案</h3>]]></content>
+        <content type="html"><![CDATA[<h2 id="一、持久化"><a href="#一、持久化" class="headerlink" title="一、持久化"></a>一、持久化</h2><p>为什么要持久化？</p><p>由于redis数据都是保存在内存中的，那么如果遇到断电等问题，没有持久化就会导致所有数据都丢失，这是很严重的问题，因此要对redis进行持久化</p><h3 id="1-RDB快照"><a href="#1-RDB快照" class="headerlink" title="1.RDB快照"></a>1.RDB快照</h3><p>RDB 是 Redis 默认的持久化方案。RDB快照(Redis Database)，当满足 一定条件的时候，会把当前内存中的数据写入磁盘，生成一个快照文件</p><p><strong>什么时候触发呢？</strong></p><p>可以分为自动触发与手动触发</p><h4 id="自动触发"><a href="#自动触发" class="headerlink" title="自动触发"></a><strong>自动触发</strong></h4><ul><li>配置触发，即间隔一定时间备份一次</li><li>shutdown正常关闭</li><li>flushall指令触发</li></ul><h4 id="手动触发"><a href="#手动触发" class="headerlink" title="手动触发"></a><strong>手动触发</strong></h4><ul><li>save：主线程去进行备份，备份期间不会去处理其他指令，其他指令必须等待</li><li>bgsave：fork一个子线程去进行备份</li></ul><h4 id="优势"><a href="#优势" class="headerlink" title="优势"></a><strong>优势</strong></h4><ul><li>快</li><li>做备份，恢复快，是非常紧凑的文件<ul><li>新起子线程，子线程会将当前Redis的数据写入一个临时文件 </li><li>当临时文件写完成后，会替换旧的RDB文件</li></ul></li><li>主线程指令操作不需要跟磁盘进行任何交互</li></ul><h4 id="劣势"><a href="#劣势" class="headerlink" title="劣势"></a><strong>劣势</strong></h4><ul><li>安全性很低，可能会有数据丢失</li><li>fork子线程可能特别耗时，cpu不友好</li></ul><h3 id="2-AOF追加"><a href="#2-AOF追加" class="headerlink" title="2.AOF追加"></a>2.AOF追加</h3><p>由于RDB的数据可靠性非常低，所以Redis又提供了另外一种持久化方案: Append Only File 简称:AOF，默认关闭，可以配置开启</p><p>那么问题来了，AOF是采用追加的方式实现的，那么它如何追加呢？每条命令都追加吗？</p><p>事实上，AOF有三种磁盘交互策略</p><ul><li>appendfsync always：表示每次写入都要执行fsync（刷新）函数，性能非常慢，但是非常安全</li><li>appendfsync everysec：表示每秒执行一次fsync函数，突然断电可能丢失1s数据</li><li>appendfsync no：由操作系统保证数据同步到磁盘，速度最快</li></ul><h4 id="重写机制"><a href="#重写机制" class="headerlink" title="重写机制"></a><strong>重写机制</strong></h4><p>为何要进行重写呢？</p><p>由于AOF是追加的形式，所以文件会越来越大，越大的话，数据加载越慢。 所以需要对AOF文件进行重写</p><p>重写流程有两个版本，这里仅介绍redis7.0之前的</p><ul><li>Redis fork一个子进程，在一个临时文件中写入新的AOF (当前内存的数据生成的新的AOF)</li><li>那么在写入新的AOF的时候，主进程还会有指令进入，那么主进程会在内存缓存区中累计新的指令 (但是同时也会写在旧的AOF文件中，就算重写失败，也不会导致AOF损坏或者数据丢失)</li><li>如果子进程重写完成，父进程会收到完成信号，并且把内存缓存中的指令追加到新的AOF文件中</li><li>替换旧的AOF文件 ，并且将新的指令附加到重写好的AOF文件中。</li></ul><p>但是这种仅使用AOF重写方式存在一个问题，那就是如果当前数据非常大，那么执行效果会很慢，因此可以采用RDB的方式生成新的AOF文件，再用AOF去新文件末尾追加后续指令</p><blockquote><p>何时重写？</p><p>可以配置一个百分比与阈值共同控制</p></blockquote><h4 id="优势-1"><a href="#优势-1" class="headerlink" title="优势"></a>优势</h4><ul><li>安全性高，就算默认的持久化同步机制，也最多只会导致1s丢失 </li><li>AOF由于某些原因，比如磁盘满了等导致追加失败，也能通过redis-check-aof 工具来修复</li><li>格式都是追加的日志，所以可读性更高</li></ul><h4 id="不足"><a href="#不足" class="headerlink" title="不足"></a>不足</h4><ul><li>数据集一般比RDB大</li><li>持久化跟数据加载比RDB更慢</li><li>在7.0之前，重写的时候，因为重写的时候，新的指令会缓存在内存 区，所以会导致大量的内存使用</li><li>并且重写期间，会跟磁盘进行2次IO，一个是写入老的AOF文件，一个 是写入新的AOF文件</li></ul><h2 id="二、集群"><a href="#二、集群" class="headerlink" title="二、集群"></a>二、集群</h2><h3 id="1-Redis主从"><a href="#1-Redis主从" class="headerlink" title="1.Redis主从"></a>1.Redis主从</h3><p><strong>为什么要有主从?</strong></p><ul><li>故障恢复：主挂了或者数据丢失了，从还会有数据冗余</li><li>负载均衡，流量分发，可以主写，从库读，减少单实例的读写压力</li><li>高可用：集群等，都是基于主从去实现的</li></ul><h4 id="1）主从数据同步"><a href="#1）主从数据同步" class="headerlink" title="1）主从数据同步"></a>1）主从数据同步</h4><ul><li>相互之间会建立连接 保存地址 端口等信息</li><li>加入从第一次成为slave，发送数据同步指令</li><li>master收到后比较repid（判断是否同步过）</li><li>不一致或为空，触发全量同步<ul><li>master使用bgsave生成rdb文件，然后把rdb发给slave，同时把自己repid&#x2F;offert给slave</li><li>生成新的rdb期间，会有新的指令，把这些指令放到一个内存</li><li>3.rdb同步完了之后，会把这些新指令也同步过去</li></ul></li><li>假如只是中间断开过，则重新同步，使用增量同步<ul><li>master发现repid符合，则去找这个slave还有哪些没有同步</li><li>offert上次偏移量即可找到上次同步位置</li><li>回去积压缓存那里去找是否有同步记录，找不到的话就全量同步</li></ul></li></ul><blockquote><p>发生主从切换，一定会有数据丢失<br>因为同步是异步的，切换主从的话主数据一定会丢失</p></blockquote><h3 id="2-Redis-sentinel哨兵"><a href="#2-Redis-sentinel哨兵" class="headerlink" title="2.Redis sentinel哨兵"></a>2.Redis sentinel哨兵</h3><p>主从虽然解决了比如负载、数据备份等问题</p><p>但是当master挂了之后，slave是不会直接升级为主，必须手动把slave升级为主</p><p>master挂了后，slave只是状态变更为down，会导致所有服务不可用</p><p>因此出现了哨兵模式来解决这个问题，当一个master挂了之后，能够通过哨兵自动选择出来一个master</p><blockquote><p>官网上哨兵介绍</p><p>Redis sentinel在<strong>不适用Cluster集群</strong>的时候，为Redis提供了高可用性。</p><p>并且提供了监测、通知、自动故障转移、配置提供等功能。</p><p><strong>监控</strong>:能够监控我的Redis各实例是否正常工作</p><p><strong>通知</strong>:如果Redis的实例出现问题，能够通知给其他实例以及sentinel</p><p><strong>自动故障转移</strong>:当我的master宕机，slave可以自动升级为master</p><p><strong>配置提供</strong>:sentinel可以提供Redis的master实例地址，那么客户端只需要 跟sentinel进行连接，master挂了后会提供新的master</p></blockquote><p>需要注意，哨兵机器需要单独设置，哨兵需要独立的服务器来运行，它们不应该与Redis实例运行在同一台机器上，这是为了保证当机器发生故障时，哨兵仍然能够继续运行并监控Redis集群的状态</p><p>哨兵能够实现自动故障转移，主要包括<strong>发现故障</strong>与<strong>故障转移</strong>两个步骤</p><h4 id="1）发现故障"><a href="#1）发现故障" class="headerlink" title="1）发现故障"></a>1）发现故障</h4><ul><li>某哨兵在一定时间内收不到master的回应，该哨兵认为主节点挂了，因此会标记一个主观下线</li><li>询问其他的sentinel，去跟master ping，如果超过quornum（配置的参数）的sentinel认为master挂了，那么就标记为ODwon（客观下线）</li></ul><h4 id="2）故障转移"><a href="#2）故障转移" class="headerlink" title="2）故障转移"></a>2）故障转移</h4><p>客观下线状态，选举一个sentinel去触发故障转移，此时其他sentibel不能触发故障转移</p><ul><li>如果配置的quornum小于等于一半，那么必须超过半数的sentinel授权，才能成为master</li><li>如果quornum超过一半，那么就要quornum数量的授权</li></ul><p>如何选举哪一个slaver为master呢？</p><ul><li>断开时间：超过一定时间失去资格</li><li>优先级slaver_priority：越小优先级越高，但是到0失去资格</li><li>根据slave赋值的偏移量offerset，数据最新的直接升级为master</li><li>RunID—实例启动时配置的唯一id</li></ul><h4 id="3）数据一致性问题"><a href="#3）数据一致性问题" class="headerlink" title="3）数据一致性问题"></a>3）数据一致性问题</h4><p>官方建议最少配置3个sentinel</p><p>原因：</p><p>如果只有1个sentinel实例，则这个实例挂了就不能保证sentinel的高可用性</p><p>如果只有2个sentinel实例，且只有一主一从，quorum&#x3D;1，那么因为网络问题，哨兵和mastre之间断网了，在这期间slave可能被选为master，从而出现两个master与客户端通信，当网络恢复时，一个master会被干掉，恢复成slave，这时它作为master接收的数据都会丢失</p><p>这也就是所谓的<strong>脑裂问题</strong></p><p><strong>指的是当主节点和哨兵节点之间网络分区后，可能导致多个哨兵节点同时将从节点提升为主节点，从而导致主从数据不一致的问题</strong></p><p>脑裂问题解决方案：</p><ul><li>min-replicas-to-write 1：配置至少有 1 个从节点，才能执行写操作。这样可以确保主节点挂掉时，还有至少一个从节点可以接替成为新的主节点，并保证集群数据不会丢失。</li><li>min-replicas-max-lag 10：配置从节点和主节点的数据同步最大延迟时间为 10 秒。如果有某个从节点的数据同步延迟超过了 10 秒，那么就不再允许该从节点成为新的主节点，以防止数据不一致的情况发生。</li></ul><p>这两个配置可以结合使用，保证 Redis 集群在发生主节点故障时，可以自动选举出新的主节点，并且选举出的节点能够保证数据一致性</p><h3 id="3-集群-cluster"><a href="#3-集群-cluster" class="headerlink" title="3.集群 cluster"></a>3.集群 cluster</h3><p>sentinel提供了比如监控、自动故障转移、客户端配置等高可用的 方案，但是没有分片功能。<br>何为分片:就是希望把数据分布到不同的节点。这样如果某些节点异常，其他数据能正常提供服务，跟微服务的思想很相似</p><blockquote><p>官网上介绍cluster提供的功能</p><p>1.多个节点之间的数据拆分，也就是数据分片</p><p>2.当某些节点遇到故障的时候，其他节点还能继续服务</p></blockquote><h4 id="1）hash-solt-虚拟槽"><a href="#1）hash-solt-虚拟槽" class="headerlink" title="1）hash solt 虚拟槽"></a>1）hash solt 虚拟槽</h4><p>如何分片？</p><p>分片就是把不同的数据放到不同的位置，相当于分表，不同的数据放到不同的表里</p><p>在Redis里面，采用的是虚拟槽的概念，就是在redis cluster里面有16384个虚拟节点，存储数据时就往这些节点里面映射，而这些节点由不同的机器负责，由此也就实现了数据的分片存储；后续这些数据跟槽的关系也不会变更，只会随着槽的负责机器不同而到不同的机器上</p><p>那么如何映射到虚拟槽呢？</p><p>计算公式：slot &#x3D; CRC16(key) &amp; 16383</p><blockquote><p>如果想把相关key放入一个虚拟槽,也就是一个实例节点，可以采用{},那么就只会根据{}里面的内容计算hash槽! 比如:<br>zhnagsan{18} 跟 lisi{18} 就会在一个虚拟槽</p></blockquote><h4 id="2）部署"><a href="#2）部署" class="headerlink" title="2）部署"></a>2）部署</h4><p>cluster模式下，最少三主三从</p><p>如何把key放到真实节点呢？可以通过命令为不同的主机分配不同范围的槽</p><p>比如三主三从时，可以让master按照如下范围负责虚拟槽</p><p>master1 0-5460虚拟槽<br>master2 5461-10922虚拟槽<br>master3 10923-16383虚拟槽</p><p>这样，每次扩容与缩容，只要改变节点跟虚拟槽之间的关系即可</p><h4 id="3）为什么槽数量是16384？"><a href="#3）为什么槽数量是16384？" class="headerlink" title="3）为什么槽数量是16384？"></a>3）为什么槽数量是16384？</h4><ul><li>16384个槽已经能够满足大多数使用情况了</li><li>16384个槽正好使用2k空间能够表示，再大的话就可能会带来资源的浪费</li></ul><blockquote><p>实际上，有参数可以修改这个值，但是一般不建议修改</p></blockquote><p>扩展：</p><p>由于虚拟槽机制，可以做数据的冷热分离，把一些热数据放到相邻的槽上，从而使他们位于固定的几台机器上，可以特意开几台性能好的机器专门处理这些热数据</p>]]></content>
       
       
       <categories>
@@ -46,31 +71,6 @@
         <tags>
             
             <tag> 并发编程基础 </tag>
-            
-        </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
-      <title>Java基础之排序算法</title>
-      <link href="/2023/04/04/Java%E5%9F%BA%E7%A1%80%E4%B9%8B%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/"/>
-      <url>/2023/04/04/Java%E5%9F%BA%E7%A1%80%E4%B9%8B%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95/</url>
-      
-        <content type="html"><![CDATA[]]></content>
-      
-      
-      <categories>
-          
-          <category> Java基础 </category>
-          
-      </categories>
-      
-      
-        <tags>
-            
-            <tag> 排序算法 </tag>
             
         </tags>
       
