@@ -4,60 +4,6 @@
   
     
     <entry>
-      <title>消息中间件之Kafka</title>
-      <link href="/2023/04/04/MQ%E4%B9%8BKafka/"/>
-      <url>/2023/04/04/MQ%E4%B9%8BKafka/</url>
-      
-        <content type="html"><![CDATA[]]></content>
-      
-      
-      <categories>
-          
-          <category> 分布式 </category>
-          
-      </categories>
-      
-      
-        <tags>
-            
-            <tag> MQ </tag>
-            
-            <tag> Kafka </tag>
-            
-        </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
-      <title>消息中间件之RocketMQ</title>
-      <link href="/2023/04/03/MQ%E4%B9%8BRocketMQ/"/>
-      <url>/2023/04/03/MQ%E4%B9%8BRocketMQ/</url>
-      
-        <content type="html"><![CDATA[]]></content>
-      
-      
-      <categories>
-          
-          <category> 分布式 </category>
-          
-      </categories>
-      
-      
-        <tags>
-            
-            <tag> MQ </tag>
-            
-            <tag> Kafka </tag>
-            
-        </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
       <title>消息中间件之RabbitMQ</title>
       <link href="/2023/04/02/MQ%E4%B9%8BRabbitMQ/"/>
       <url>/2023/04/02/MQ%E4%B9%8BRabbitMQ/</url>
