@@ -33,35 +33,6 @@
     
     
     <entry>
-      <title>消息中间件之RocketMQ</title>
-      <link href="/2023/04/03/MQ%E4%B9%8BRocketMQ/"/>
-      <url>/2023/04/03/MQ%E4%B9%8BRocketMQ/</url>
-      
-        <content type="html"><![CDATA[<h2 id="一、架构"><a href="#一、架构" class="headerlink" title="一、架构"></a>一、架构</h2><p>最开始叫 MetaQ(Meta-morphosis [ˌmetəˈmɔːfəsɪs]变形)</p><p>淘宝原来有一 个自研的 MQ 叫 Notify，Kafka 开源以后，就参考 Kafka 用 Java 语言写了 MetaQ， 所以在涉及思想上有很多跟 Kafka 相似的地方。后来改名字叫 RocketMQ，2012 年开源</p><h3 id="1-整体架构"><a href="#1-整体架构" class="headerlink" title="1.整体架构"></a>1.整体架构</h3><img src="https://static-2w2.pages.dev/post/mq-rocket-all.png" alt="image-20230415151544795" style="zoom:45%;" /><p>首先分析一下RocketMQ的整体架构图，它的构成也和其他MQ类似，生产者，Broker和消费者</p><p>与Kafka不同的是，RocketMQ不需要ZK的配合使用，它自身便有NameServer来负责类似ZK的功能</p><h3 id="2-Broker"><a href="#2-Broker" class="headerlink" title="2.Broker"></a>2.Broker</h3><p>RocketMQ 的服务，或者说一个进程，叫做 Broker，Broker 的作用是存储和转发消息RocketMQ 单机大约能承受 10 万 QPS 的请求</p><img src="https://static-2w2.pages.dev/post/mq-rocket-broker.png" alt="image-20230415151907234" style="zoom:50%;" /><p>为了提升 Broker 的可用性(防止单点故障)，以及提升服务器的性能(实现负载)， 通常会做集群的部署<br>跟 Kafka 或者 Redis Cluster 一样，RocketMQ 集群的每个 Broker 节点保存总数据的一部分，因此可以实现横向扩展</p><p>而为了提升数据的可靠性，每个Broker还会有自己的副本slave</p><img src="https://static-2w2.pages.dev/post/mq-rocket-replaice.png" alt="image-20230415152108748" style="zoom:50%;" /><p>默认情况下，读写都发生在 Master 上</p><p>在 slaveReadEnable&#x3D;true 的情况下， Slave 也可以参与读负载</p><p>但是默认只有 brokerId&#x3D;1 的 Slave 才会参与读负载，而且是在 Master 消费慢的情况下，由whichBrokerWhenConsumeSlowly这个参数决定</p><h3 id="3-Topic"><a href="#3-Topic" class="headerlink" title="3.Topic"></a>3.Topic</h3><p>Topic 用于将消息按主题做划分，比如订单消息、物流消息</p><blockquote><p>注意，跟 Kafka 不 同的是，在 RocketMQ 中，Topic 是一个逻辑概念，消息不是按 Topic 划分存储的</p></blockquote><img src="https://static-2w2.pages.dev/post/mq-rocket-topic.png" alt="image-20230415152314114" style="zoom:50%;" /><p>roducer 将消息发往指定的 Topic，Consumer 订阅这个 Topic 就可以收到相应的消息<br> 跟 Kafka 一样，如果 Topic 不存在，会自动创建，BrokerConfig:</p><figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">private</span> <span class="string">boolean autoCreateTopicEnable = true;</span></span><br></pre></td></tr></table></figure><p>Topic 跟生产者和消费者都是多对多的关系，一个生产者可以发送消息到多个Topic，一个消费者也可以订阅多个Topic</p><h3 id="4-NameServer"><a href="#4-NameServer" class="headerlink" title="4.NameServer"></a>4.NameServer</h3><h4 id="4-1-基础结构"><a href="#4-1-基础结构" class="headerlink" title="4.1 基础结构"></a>4.1 基础结构</h4><p>当不同的消息存储在不同的 Broker 上，生产者和消费者对于 Broker 的选取，或者说路由选择是一个非常关键的问题</p><ul><li>路由：生产者发一条消息，应该发到哪个 Broker？消费者接收消息，从哪个 Broker 获取消息?</li><li>服务端增减：如果 Broker 增加或者减少了，客户端怎么知道?？</li><li>客户端增加：一个新的生产者或者消费者加入，怎么知道有哪些 Broker</li></ul><p>所以，跟分布式的服务调用的场景需要一个注册中心一样，在 RocketMQ 中需要有一个角色来管理 Broker 的信息</p><blockquote><p>在Kafka中，使用ZK管理的路由选择功能</p></blockquote><p>在Rocket中，并没有使用ZK做一些路由发现，存活状态监听等工作，而是把这份工作交给了自己创建的组件NameServer来实现</p><p>可以把 NameServer 理解为是 RocketMQ 的路由中心，每一个 NameServer 节点都保存着全量的路由信息，为了保证高可用，NameServer 自身也可以做集群的部署</p><p>它的作用有点像 Eureka 或者 Redis Sentinel</p><p>也就是说，Broker 会在 NameServer 上注册自己，Porducer 和 Consumer 用 NameServer 来发现 Broker</p><img src="/Users/zjyan/Library/Application Support/typora-user-images/image-20230415153919043.png" alt="image-20230415153919043" style="zoom:50%;" /><p>那么，NameServer的工作机制到底是怎样的呢？</p><p>每个 Broker 节点在启动时，都会根据配置遍历 NameServer 列表，如下配置</p><p>文件：rocketmq&#x2F;conf&#x2F;broker.conf</p><figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">namesrvAddr</span>=<span class="string">localhost:9876</span></span><br></pre></td></tr></table></figure><p><strong>存活检测</strong></p><p>与每个 NameServer 建立 TCP 长连接，注册自己的信息，之后每隔 30s 发送心跳信息（服务主动注册）</p><p>那么如果 Broker 挂掉了，不发送心跳了，NameServer 怎么发现呢？</p><p>因此NameServer也会主动的去探测Broker是否存活</p><p><strong>定时探活</strong></p><p>每个 NameServer 每隔 10s 检查一下各个Broker 的最近一次心跳时间，如果发现某个 Broker 超过 120s 都没发送心跳，就认为 这个 Broker 已经挂掉了，会将其从路由信息里移除</p><img src="/Users/zjyan/IdeaProjects/static/post/mq-rocket-nameserve2.png" alt="image-20230415154300081" style="zoom:50%;" /><h4 id="4-2-为什么不用ZK？"><a href="#4-2-为什么不用ZK？" class="headerlink" title="4.2 为什么不用ZK？"></a>4.2 为什么不用ZK？</h4><p>实际上不是不用，在 RocketMQ 的早期版本，即 MetaQ 1.x 和 2.x 阶段，服务管理也是用 Zookeeper 实现的，跟 Kafka 一样，但MetaQ 3.x(即 RocketMQ)却去 掉了 ZooKeeper 依赖，转而采用自己的 NameServer</p><p>RocketMQ 的架构设计决定了只需要一个轻量级的元数据服务器就足够了，只需要保持最终一致，而<strong>不需要 Zookeeper 这样的强一致性解决方案</strong>，不需要再依赖另一个中间件，从而减少整体维护成本</p><p>根据著名的 CAP 理论：一致性(Consistency)、可用性(Availability)、分区容错性 (Partiton Tolerance)。Zookeeper 实现了 CP，NameServer 选择了 AP，放弃了实时一致性</p><h4 id="4-3-一致性问题"><a href="#4-3-一致性问题" class="headerlink" title="4.3 一致性问题"></a>4.3 一致性问题</h4><p>上面提到了NameServer放弃了实时一致性，那它是如何保持一致性的呢？</p><p>NameServer之间是</p>]]></content>
-      
-      
-      <categories>
-          
-          <category> 分布式 </category>
-          
-      </categories>
-      
-      
-        <tags>
-            
-            <tag> MQ </tag>
-            
-            <tag> 消息队列 </tag>
-            
-            <tag> RocketMQ </tag>
-            
-        </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
       <title>消息中间件之RabbitMQ</title>
       <link href="/2023/04/02/MQ%E4%B9%8BRabbitMQ/"/>
       <url>/2023/04/02/MQ%E4%B9%8BRabbitMQ/</url>
